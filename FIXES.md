@@ -134,10 +134,14 @@ per-frame callbacks. The stuck state is the first wait in that phase:
 ```
 f_700018d8d0(state=1)
   -> f_700018ddf0
-     -> f_700045c630(handle=0x1e3ffffffff, key=0)
+     -> f_700045c630(handle=0x1e3ffffffff, key=0 or 1)
         -> f_7000947690
            -> f_70009842d0    (child completion callback, keeps returning busy)
 ```
+
+A second warp gate reproduced the same dead wait with a live, read-only process
+memory check: `phase=0xe`, phase-object `state=1`, handle `0x1e3ffffffff`,
+`key=1`. The first fix only accepted `key=0`, so it did not release this gate.
 
 The leaf counter at `+0xb0` is `0xfffffffd` (`-3`) and `+0xb5` is `0`. `-3` is
 the value written by the node's initializer (`f_7000982ca0`) and by its reset
@@ -157,9 +161,11 @@ stall, input timing, and simply resetting the `0x3d43` counter. Normalising the
 
 **Fix.** `tools/apply_warp_wait_fix.py` patches the generated
 `main/main_0010.c` immediately after `f_700045c630` in `f_700018ddf0`. For the
-specific presentation-task signature `(low32(handle) == 0xffffffff, key == 0)`
-it treats the never-clearing wait as satisfied. This lets the phase state machine
-advance and is deliberately narrow: no global completion callback is changed.
+sentinel presentation-task handle (`low32(handle) == 0xffffffff`) it treats the
+never-clearing wait as satisfied. The task key varies between warp gates - `0`
+and `1` were both observed - so the patch deliberately ignores the key and only
+checks the sentinel low half. This lets the phase state machine advance without
+changing any global completion callback.
 
 The patch is idempotent and fails loudly if the generated call site is missing.
 `tools/patches/warp-wait-generated.patch` is the same one-site change in unified
