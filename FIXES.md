@@ -111,7 +111,7 @@ triangles around it disappeared.
 highlight vanishing intermittently; with the mask in place the count of refused
 restarts stays at zero.
 
-## 5. Confirming a transfer tile froze the battle and removed the arriving unit
+## 5. Confirming a warp tile on the battle map froze the transfer and removed the arriving unit
 
 **Symptom.** After stepping on a warp/transfer tile and confirming, the source
 unit played its fade-out and disappeared, the pink/blue destination effect
