@@ -1,0 +1,16 @@
+--- a/generated/v327680/main/main_0010.c
++++ b/generated/v327680/main/main_0010.c
+@@ -34638,7 +34638,12 @@
+     { uint64_t ea = x9 + 0x0ull; uint64_t v = LD64(ea); c->x[0] = (uint64_t)(v); }
+     { uint64_t ea = x8 + 0x0ull; uint64_t v = LD64(ea); c->x[1] = (uint64_t)(v); }
+     { uint64_t ea = x8 + 0x8ull; uint64_t v = LD32(ea); c->x[2] = (uint64_t)(v); }
+-    c->x[30] = 0x700018de3cull; c->x[8] = x8; c->x[9] = x9; c->x[19] = x19; c->sp = sp_; f_700045c630(c); x8 = c->x[8]; x9 = c->x[9]; x10 = c->x[10]; x11 = c->x[11];
++    { uint64_t chk_h = c->x[1], chk_key = c->x[2]; c->x[30] = 0x700018de3cull; c->x[8] = x8; c->x[9] = x9; c->x[19] = x19; c->sp = sp_; f_700045c630(c);
++      /* Warp fix: phase 0xe / state 1 waits forever on this -1-keyed presentation task.
++         Its leaf completion check never turns over on the PC recomp, so treat the wait as
++         satisfied for this handle signature and let the phase machine advance. */
++      if (((uint32_t)chk_h) == 0xffffffffu && chk_key == 0 && c->x[0] != 0) c->x[0] = 0;
++      x8 = c->x[8]; x9 = c->x[9]; x10 = c->x[10]; x11 = c->x[11]; }
+     (void)(flogic32(&F, (uint32_t)c->x[0] & 0xffull));
+     if (fc_logic32(&F, CC_EQ)) { goto L_700018de4c; }
+     c->x[0] = (uint32_t)(0u | 0u);
