@@ -1,11 +1,13 @@
 # Fixes for Fire Emblem: Three Houses
 
-Four bugs found while playing FE3H through this runtime, plus the diagnostics that
+Five bugs found while playing FE3H through this runtime, plus the diagnostics that
 found them. Everything here was measured on the game's own build (v327680, US) on
 a GTX 1060 6 GB under Windows 11, at the game's fixed 30 fps.
 
-The commits apply on top of `47ef991`. Nothing changes unless the settings listed
-at the end are set.
+The commits apply on top of `47ef991`. The first four change nothing unless the
+settings listed at the end are set. The fifth is a generated-code patch applied
+by `tools/apply_warp_wait_fix.py` after `recomp/gen.py` and before
+`tools/build_game.py`.
 
 ## 1. Textures that sample through a format-reinterpreting view came out washed out
 
@@ -109,7 +111,67 @@ triangles around it disappeared.
 highlight vanishing intermittently; with the mask in place the count of refused
 restarts stays at zero.
 
-## 5. Diagnostics
+## 5. Confirming a transfer tile froze the battle and removed the arriving unit
+
+**Symptom.** After stepping on a warp/transfer tile and confirming, the source
+unit played its fade-out and disappeared, the pink/blue destination effect
+appeared, but the arrival animation and the unit at the destination never
+started. The game then stopped advancing. The same sequence is smooth on the
+console/iPad build, so this is a recomp-side fidelity bug, not a game rule.
+
+**Cause.** All timings here use the input script's game world clock (`@ms`), not
+frames or wall time. The valid reproduction reached:
+
+```
+@34600  phase=0x2, phase-object state=0
+@34700  phase=0xe, phase-object state=1
+@35000+ phase=0xe, phase-object state=1   (unchanged)
+```
+
+`phase=0xe` is a real phase, not a bad queue index: its object still receives
+per-frame callbacks. The stuck state is the first wait in that phase:
+
+```
+f_700018d8d0(state=1)
+  -> f_700018ddf0
+     -> f_700045c630(handle=0x1e3ffffffff, key=0)
+        -> f_7000947690
+           -> f_70009842d0    (child completion callback, keeps returning busy)
+```
+
+The leaf counter at `+0xb0` is `0xfffffffd` (`-3`) and `+0xb5` is `0`. `-3` is
+the value written by the node's initializer (`f_7000982ca0`) and by its reset
+paths (`f_7000983640`, `f_70009845d0`), so it is a legal idle value, not memory
+corruption. The actual blocker is one level higher: the child completion
+callback does not flip to "done" on the PC recomp. The completion query therefore
+returns "not finished" forever, `state=1` never advances to `4` and `5`, and
+`phase=0xe` never returns to `0`. Once that happens the unit/update chain also
+stops; with `fnprof` windows aligned to the same clock, `f_70003d6aa0`,
+`f_70000a4570`, `f_700009d0f0` and `f_700009d370` all drop to zero after the
+transfer.
+
+Explored and rejected on the way here: OS-event deadlock, timer wait, GPU/CPU
+writeback, file IO, resource loading, actor container emptiness, rendering
+stall, input timing, and simply resetting the `0x3d43` counter. Normalising the
+`-3` leaf counter was also tried and did not release the wait.
+
+**Fix.** `tools/apply_warp_wait_fix.py` patches the generated
+`main/main_0010.c` immediately after `f_700045c630` in `f_700018ddf0`. For the
+specific presentation-task signature `(low32(handle) == 0xffffffff, key == 0)`
+it treats the never-clearing wait as satisfied. This lets the phase state machine
+advance and is deliberately narrow: no global completion callback is changed.
+
+The patch is idempotent and fails loudly if the generated call site is missing.
+`tools/patches/warp-wait-generated.patch` is the same one-site change in unified
+diff form for review.
+
+**Verification.** With the patch, the world-clock trace shows `state 1 -> 4 -> 5`
+and `phase 0xe -> 0`, `3d5f` returns to `1`, and the `fnprof` window at `@35000`
+contains the unit/update calls again. Screenshots show the male unit appearing
+in the destination warp circle, the arrival effect, `PLAYER PHASE`, and then the
+normal battle map. No game-content files or settings are needed for the fix.
+
+## 6. Diagnostics
 
 Off unless asked for, and cheap:
 
