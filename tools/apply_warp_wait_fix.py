@@ -25,13 +25,14 @@ OLD = (
 )
 
 NEW = (
-    "    { uint64_t chk_h = c->x[1], chk_key = c->x[2]; "
+    "    { uint64_t chk_h = c->x[1]; "
     "c->x[30] = 0x700018de3cull; c->x[8] = x8; c->x[9] = x9; "
     "c->x[19] = x19; c->sp = sp_; f_700045c630(c);\n"
-    "      /* Warp fix: phase 0xe / state 1 waits forever on this -1-keyed presentation task.\n"
+    "      /* Warp fix: phase 0xe / state 1 waits forever on this sentinel-keyed presentation task.\n"
+    "         The task key varies (0/1 observed), but the low half of the handle is always -1.\n"
     "         Its leaf completion check never turns over on the PC recomp, so treat the wait as\n"
-    "         satisfied for this handle signature and let the phase machine advance. */\n"
-    "      if (((uint32_t)chk_h) == 0xffffffffu && chk_key == 0 && c->x[0] != 0) c->x[0] = 0;\n"
+    "         satisfied for that handle signature and let the phase machine advance. */\n"
+    "      if (((uint32_t)chk_h) == 0xffffffffu && c->x[0] != 0) c->x[0] = 0;\n"
     "      x8 = c->x[8]; x9 = c->x[9]; x10 = c->x[10]; x11 = c->x[11]; }\n"
 )
 
